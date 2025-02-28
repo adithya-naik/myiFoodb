@@ -9,7 +9,7 @@ const port = process.env.PORT
 
 app.use((req, res, next) => {
   // react app port number 
-  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:5174');
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type,auth-token, Accept');
   next();
 });
