@@ -61,6 +61,7 @@ app.use('/api', require('./routes/createUser'));
 app.use('/api', require('./routes/getData'));
 app.use('/api', require('./routes/orderData'));
 app.use('/api', require('./routes/fetchUserOrders'));
+app.use('/api/profile', require('./routes/userProfile'));
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
