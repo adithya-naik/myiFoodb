@@ -1,21 +1,26 @@
-// Backend - Add this to your existing routes file
 const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
 const { body, validationResult } = require("express-validator");
 const bcrypt = require("bcryptjs");
-require('dotenv').config()
-const jwt = require("jsonwebtoken");
-const jwtSecret = process.env.SECRET_KEY;
 
 // Get User Profile
-// Route to get user profile data by email
 router.post("/getUserProfile", async (req, res) => {
+  console.log("getUserProfile route hit", req.body);
   try {
-    const email = req.body.email;
+    const { email } = req.body;
+    
+    if (!email) {
+      console.log("No email provided in request");
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+    
+    console.log(`Looking for user with email: ${email}`);
     
     // Find user by email
     const userData = await User.findOne({ email });
+    
+    console.log("User lookup result:", userData ? "User found" : "User not found");
     
     if (!userData) {
       return res.status(404).json({ success: false, message: "User not found" });
@@ -25,18 +30,19 @@ router.post("/getUserProfile", async (req, res) => {
     const userProfile = {
       name: userData.name,
       email: userData.email,
-      location: userData.location,
+      location: userData.location || "",
       _id: userData._id
     };
     
-    res.json({ success: true, user: userProfile });
+    console.log("Sending user profile data:", userProfile);
+    return res.status(200).json({ success: true, user: userProfile });
   } catch (error) {
     console.error("Error fetching user profile:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
-// Update User Profile
+// Update User Profile 
 router.post(
   "/updateProfile",
   [
@@ -45,63 +51,130 @@ router.post(
     body("location", "Location is required").notEmpty()
   ],
   async (req, res) => {
+    console.log("updateProfile route hit", req.body);
     // Validate input
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ success: false, errors: errors.array() });
     }
-
+    
     try {
       const { email, name, location, password, currentEmail } = req.body;
       
       // Find user by their current email
-      const userData = await User.findOne({ email: currentEmail });
+      let user = await User.findOne({ email: currentEmail });
       
-      if (!userData) {
+      if (!user) {
+        console.log(`User not found with email: ${currentEmail}`);
         return res.status(404).json({ success: false, message: "User not found" });
       }
       
-      // Prepare update object
-      const updateData = {
-        name,
-        location
-      };
+      console.log("Found user to update:", {
+        id: user._id,
+        currentName: user.name,
+        currentEmail: user.email
+      });
       
-      // If email is being changed, update it
+      // Check if new email is already in use by another user
       if (email !== currentEmail) {
-        // Check if the new email already exists
         const emailExists = await User.findOne({ email });
-        if (emailExists) {
+        if (emailExists && emailExists._id.toString() !== user._id.toString()) {
           return res.status(400).json({ success: false, message: "Email already in use" });
         }
-        updateData.email = email;
       }
+      
+      // Update user fields directly
+      user.name = name;
+      user.email = email;
+      user.location = location;
       
       // If password is being updated
       if (password && password.length >= 5) {
         const salt = await bcrypt.genSalt(10);
-        updateData.password = await bcrypt.hash(password, salt);
+        user.password = await bcrypt.hash(password, salt);
+        console.log("Password hashed and ready to be saved");
       }
       
-      // Update user profile
-      await User.findByIdAndUpdate(
-        userData._id,
-        { $set: updateData },
-        { new: true }
-      );
+      // Save the updated user
+      await user.save();
+      
+      console.log("User updated successfully:", {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        location: user.location
+      });
       
       res.json({ 
-        success: true, 
+        success: true,
         message: "Profile updated successfully",
         user: {
-          name: updateData.name,
-          email: updateData.email || currentEmail,
-          location: updateData.location
+          name: user.name,
+          email: user.email,
+          location: user.location
         }
       });
     } catch (error) {
       console.error("Error updating profile:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ 
+        success: false, 
+        message: "Server error", 
+        error: error.message 
+      });
+    }
+  }
+);
+
+// Delete User Account
+router.post(
+  "/deleteAccount",
+  [
+    body("email", "Email is required").isEmail(),
+    body("password", "Password is required").notEmpty()
+  ],
+  async (req, res) => {
+    console.log("deleteAccount route hit");
+    
+    // Validate input
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+    
+    try {
+      const { email, password } = req.body;
+      
+      // Find user by email
+      const user = await User.findOne({ email });
+      
+      if (!user) {
+        return res.status(404).json({ success: false, message: "User not found" });
+      }
+      
+      // Verify password
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(401).json({ success: false, message: "Invalid password" });
+      }
+      
+      console.log(`Deleting user with email: ${email}`);
+      
+      // Delete the user
+      await User.findByIdAndDelete(user._id);
+      
+      console.log("User deleted successfully");
+      
+      res.json({
+        success: true,
+        message: "Account deleted successfully"
+      });
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Server error", 
+        error: error.message 
+      });
     }
   }
 );

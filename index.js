@@ -61,7 +61,14 @@ app.use('/api', require('./routes/createUser'));
 app.use('/api', require('./routes/getData'));
 app.use('/api', require('./routes/orderData'));
 app.use('/api', require('./routes/fetchUserOrders'));
-app.use('/api/profile', require('./routes/userProfile'));
+// app.use('/api/profile', require('./routes/userProfile'));
+try {
+  const userProfileRoutes = require('./routes/userProfile');
+  app.use('/api', userProfileRoutes);
+  console.log('Successfully loaded userProfile routes');
+} catch (err) {
+  console.error('Error loading userProfile routes:', err);
+}
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
