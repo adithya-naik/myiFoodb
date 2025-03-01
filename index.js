@@ -54,7 +54,9 @@ app.use(express.json());
 app.get('/', (req, res) => {
   res.send('Hello World! ----');
 });
-
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'API is working!' });
+});
 app.use('/api', require('./routes/createUser'));
 app.use('/api', require('./routes/getData'));
 app.use('/api', require('./routes/orderData'));
